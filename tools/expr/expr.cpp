@@ -143,7 +143,6 @@ void klee_array_dispose(klee_array_t array) {
 klee_update_list_t klee_update_list_create(const klee_array_t array) {
   auto *TheArray = unwrap(array);
   // Bump the reference count of the array so that it lives on when disposed of
-  TheArray->get()->refCount++;
   UpdateList *TheUpdateList = new UpdateList(TheArray->get(), nullptr);
   return wrap(TheUpdateList);
 }
@@ -165,9 +164,11 @@ klee_update_list_t klee_update_list_copy(klee_update_list_t list) {
 
 void klee_update_list_dispose(klee_update_list_t list) {
   UpdateList *TheUpdateList = unwrap(list);
-  // This should automatically decrement the reference count of the underlying
-  // array and delete it if necessary
-  ref<Array> TheRefArray(const_cast<Array *>(TheUpdateList->root));
+  // This should automatically at the end of the scope decrement the reference
+  // count of the underlying array and delete it if necessary
+  // XXX: This is disgusting but we need this to support ref-counted array's here
+  auto *TheDirtyArray = const_cast<Array *>(TheUpdateList->root);
+  ref<Array> TheRefArray(TheDirtyArray);
   delete TheUpdateList;
 }
 

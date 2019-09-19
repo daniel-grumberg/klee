@@ -65,16 +65,19 @@ UpdateList::UpdateList(const Array *_root, const UpdateNode *_head)
   : root(_root),
     head(_head) {
   if (head) ++head->refCount;
+  ++root->refCount;
 }
 
 UpdateList::UpdateList(const UpdateList &b)
   : root(b.root),
     head(b.head) {
   if (head) ++head->refCount;
+  ++root->refCount;
 }
 
 UpdateList::~UpdateList() {
     tryFreeNodes();
+    --root->refCount;
 }
 
 void UpdateList::tryFreeNodes() {
