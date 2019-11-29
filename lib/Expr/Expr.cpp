@@ -1214,3 +1214,4 @@ CMPCREATE(SleExpr, Sle)
 
 ref<ConstantExpr> ConstantExpr::SmallConstants[201];
 ref<ConstantExpr> ConstantExpr::ByteCache[256];
+ref<ConstantExpr> ConstantExpr::BoolCache[2];

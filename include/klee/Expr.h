@@ -1001,6 +1001,7 @@ private:
   llvm::APInt value;
   static ref<ConstantExpr> SmallConstants[201];
   static ref<ConstantExpr> ByteCache[256];
+  static ref<ConstantExpr> BoolCache[2];
 
   ConstantExpr(const llvm::APInt &v) : value(v) {}
 
@@ -1065,6 +1066,10 @@ public:
 
   static ref<ConstantExpr> alloc(const llvm::APInt &v) {
     ref<ConstantExpr> *CachedExpr = nullptr;
+
+    if (v.getBitWidth() == Expr::Bool) {
+      CachedExpr = &BoolCache[v.getZExtValue()];
+    }
 
     if (v.getBitWidth() == Expr::Int8) {
       CachedExpr = &ByteCache[v.getZExtValue()];
