@@ -137,7 +137,7 @@ namespace {
   RunInDir("run-in-dir",
            cl::desc("Change to the given directory before starting execution (default=location of tested file)."),
            cl::cat(StartCat));
-  
+
   cl::opt<std::string>
   OutputDir("output-dir",
             cl::desc("Directory in which to write results (default=klee-out-<N>)"),
@@ -159,7 +159,7 @@ namespace {
   WarnAllExternals("warn-all-external-symbols",
                    cl::desc("Issue a warning on startup for all external symbols (default=false)."),
                    cl::cat(StartCat));
-  
+
 
   /*** Linking options ***/
 
@@ -224,10 +224,10 @@ namespace {
 
 
   /*** Replaying options ***/
-  
+
   cl::OptionCategory ReplayCat("Replaying options",
                                "These options impact replaying of test cases.");
-  
+
   cl::opt<bool>
   ReplayKeepSymbolic("replay-keep-symbolic",
                      cl::desc("Replay the test cases only by asserting "
@@ -1089,8 +1089,8 @@ createLibCWrapper(std::vector<std::unique_ptr<llvm::Module>> &modules,
   llvm::IRBuilder<> Builder(bb);
 
   std::vector<llvm::Value*> args;
-  args.push_back(
-      llvm::ConstantExpr::getBitCast(inModuleRefernce, ft->getParamType(0)));
+  args.push_back(llvm::ConstantExpr::getBitCast(
+      cast<Constant>(inModuleRefernce.getCallee()), ft->getParamType(0)));
   args.push_back(&*(stub->arg_begin())); // argc
   auto arg_it = stub->arg_begin();
   args.push_back(&*(++arg_it)); // argv

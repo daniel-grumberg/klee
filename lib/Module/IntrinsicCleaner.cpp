@@ -194,9 +194,9 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
       case Intrinsic::trap: {
         // Intrinsic instruction "llvm.trap" found. Directly lower it to
         // a call of the abort() function.
-        Function *F = cast<Function>(
-            M.getOrInsertFunction("abort", Type::getVoidTy(ctx)
-		    KLEE_LLVM_GOIF_TERMINATOR));
+        FunctionCallee FC = M.getOrInsertFunction(
+            "abort", Type::getVoidTy(ctx) KLEE_LLVM_GOIF_TERMINATOR);
+        Function *F = cast<Function>(FC.getCallee());
         F->setDoesNotReturn();
         F->setDoesNotThrow();
 

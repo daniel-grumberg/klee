@@ -46,7 +46,7 @@
 
 int open(const char *pathname, int flags, ...) {
   mode_t mode = 0;
-  
+
   if (flags & O_CREAT) {
     /* get mode */
     va_list ap;
@@ -60,7 +60,7 @@ int open(const char *pathname, int flags, ...) {
 
 int openat(int fd, const char *pathname, int flags, ...) {
   mode_t mode = 0;
-  
+
   if (flags & O_CREAT) {
     /* get mode */
     va_list ap;
@@ -109,8 +109,9 @@ int statfs(const char *path, struct statfs *buf) {
   return __fd_statfs(path, buf);
 }
 
-int getdents64(unsigned int fd, struct dirent *dirp, unsigned int count) {
-  return __fd_getdents(fd, (struct dirent64*) dirp, count);
-}
-int __getdents64(unsigned int fd, struct dirent *dirp, unsigned int count)
-     __attribute__((alias("getdents64")));
+// TODO: Correct solution for this would be nice...
+/* int getdents64(unsigned int fd, struct dirent *dirp, unsigned int count) { */
+/*   return __fd_getdents(fd, (struct dirent64*) dirp, count); */
+/* } */
+/* int __getdents64(unsigned int fd, struct dirent *dirp, unsigned int count) */
+/*      __attribute__((alias("getdents64"))); */
