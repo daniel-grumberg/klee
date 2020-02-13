@@ -166,7 +166,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 ################################################################################
 set(KLEE_COMPONENT_EXTRA_INCLUDE_DIRS "")
 set(KLEE_COMPONENT_CXX_DEFINES "")
-set(KLEE_COMPONENT_CXX_FLAGS "")
+set(KLEE_COMPONENT_CXX_FLAGS "-fPIC")
 set(KLEE_SOLVER_LIBRARIES "")
 set(KLEE_COMPONENT_EXTRA_LIBRARIES "")
 

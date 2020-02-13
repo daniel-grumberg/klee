@@ -14,8 +14,10 @@
 
 #include "klee-c/expr.h"
 
+#include "klee/Constraints.h"
 #include "klee/Expr.h"
 #include "klee/ExprBuilder.h"
+#include "klee/Solver.h"
 
 #include "llvm/Support/CBindingWrapping.h"
 
@@ -38,6 +40,8 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(ref<Expr>, klee_expr_t)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(ref<Array>, klee_array_t)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(UpdateList, klee_update_list_t)
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(LibExprBuilder, klee_expr_builder_t)
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(ConstraintManager,
+                                   klee_constraint_manager_t);
 
 // Conceptually passing ref<Expr> around the ABI boundary is a bit trickier than
 // it looks. Effectively, we cannot pass it out by value, so we have to copy
@@ -68,6 +72,48 @@ klee_expr_builder_create(registration_fn_t registration_fn) {
 void klee_expr_builder_dispose(klee_expr_builder_t builder) {
   LibExprBuilder *TheBuilder = unwrap(builder);
   delete TheBuilder;
+}
+
+klee_constraint_manager_t klee_expr_constraint_manager_create(void) {
+  ConstraintManager *TheManager = new ConstraintManager();
+  return wrap(TheManager);
+}
+
+void klee_expr_constraint_manager_dispose(klee_constraint_manager_t manager) {
+  ConstraintManager *TheManager = unwrap(manager);
+  delete TheManager;
+}
+
+void klee_expr_constraint_manager_add(klee_constraint_manager_t manager,
+                                      klee_expr_t constraint) {
+  ConstraintManager *TheManager = unwrap(manager);
+  ref<Expr> *TheConstraint = unwrap(constraint);
+  TheManager->addConstraint(*TheConstraint);
+}
+
+size_t klee_expr_constraint_manager_size(klee_constraint_manager_t manager) {
+  ConstraintManager *TheManager = unwrap(manager);
+  return TheManager->size();
+}
+
+void klee_expr_constraint_manager_dump(klee_constraint_manager_t manager) {
+  ConstraintManager *TheManager = unwrap(manager);
+  for (auto i = TheManager->begin(), e = TheManager->end(); i != e; ++i) {
+    ref<Expr> TheConstraint = *i;
+    TheConstraint->dump();
+    llvm::errs() << " \n";
+  }
+}
+
+const char *
+klee_expr_constraint_manager_get_smtlibv2(klee_constraint_manager_t manager) {
+  ConstraintManager *TheManager = unwrap(manager);
+
+  Solver *TheZ3Solver = klee::createCoreSolver(klee::CoreSolverType::Z3_SOLVER);
+  TheZ3Solver->setCoreSolverTimeout(klee::time::Span("30s"));
+
+  Query TheQuery(*TheManager, ConstantExpr::alloc(0, klee::Expr::Bool));
+  return TheZ3Solver->getConstraintLog(TheQuery);
 }
 
 klee_expr_width_t klee_expr_get_width(klee_expr_t expr) {

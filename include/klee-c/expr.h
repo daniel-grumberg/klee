@@ -36,6 +36,9 @@ typedef struct OpaqueUpdateList *klee_update_list_t;
 // Opaque wrapping type for ExprBuilder
 typedef struct OpaqueExprBuilder *klee_expr_builder_t;
 
+// Opaque wrapping type for ConstraintManager
+typedef struct OpaqueConstraintManager *klee_constraint_manager_t;
+
 typedef void (*registration_fn_t)(klee_expr_t);
 
 #ifdef __cplusplus
@@ -47,6 +50,23 @@ klee_expr_builder_create(registration_fn_t registration_fn);
 
 /// Destroys a klee_expr_builder_t
 extern void klee_expr_builder_dispose(klee_expr_builder_t builder);
+
+extern klee_constraint_manager_t klee_expr_constraint_manager_create(void);
+
+extern void
+klee_expr_constraint_manager_dispose(klee_constraint_manager_t manager);
+
+extern void klee_expr_constraint_manager_add(klee_constraint_manager_t manager,
+                                             klee_expr_t constraint);
+
+extern size_t
+klee_expr_constraint_manager_size(klee_constraint_manager_t manager);
+
+extern void
+klee_expr_constraint_manager_dump(klee_constraint_manager_t manager);
+
+extern const char *
+klee_expr_constraint_manager_get_smtlibv2(klee_constraint_manager_t manager);
 
 extern klee_expr_width_t klee_expr_get_width(klee_expr_t expr);
 
@@ -98,9 +118,8 @@ extern klee_update_list_t klee_update_list_create(const klee_array_t array);
 extern void klee_update_list_extend(klee_update_list_t updates, klee_expr_t idx,
                                     klee_expr_t value);
 
-
-/// Copies the underlying update list so that the caller can have a new reference
-/// to the update list. The array should be freed by the caller.
+/// Copies the underlying update list so that the caller can have a new
+/// reference to the update list. The array should be freed by the caller.
 ///
 /// param [list] The update list to copy
 extern klee_update_list_t klee_update_list_copy(klee_update_list_t list);

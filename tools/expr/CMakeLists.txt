@@ -8,11 +8,6 @@
 #===------------------------------------------------------------------------===#
 klee_add_shared_component(expr
   expr.cpp
-  ${CMAKE_SOURCE_DIR}/lib/Expr/ArrayCache.cpp
-  ${CMAKE_SOURCE_DIR}/lib/Expr/ExprBuilder.cpp
-  ${CMAKE_SOURCE_DIR}/lib/Expr/ExprPPrinter.cpp
-  ${CMAKE_SOURCE_DIR}/lib/Expr/Expr.cpp
-  ${CMAKE_SOURCE_DIR}/lib/Expr/Updates.cpp
 )
 
 set(LLVM_COMPONENTS
@@ -21,3 +16,4 @@ set(LLVM_COMPONENTS
 
 klee_get_llvm_libs(LLVM_LIBS ${LLVM_COMPONENTS})
 target_link_libraries(expr PUBLIC ${LLVM_LIBS})
+target_link_libraries(expr PRIVATE  kleaverSolver)
