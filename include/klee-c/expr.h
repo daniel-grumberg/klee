@@ -68,6 +68,15 @@ klee_expr_constraint_manager_dump(klee_constraint_manager_t manager);
 extern const char *
 klee_expr_constraint_manager_get_smtlibv2(klee_constraint_manager_t manager);
 
+extern int
+klee_expr_constraint_manager_get_ktest(klee_constraint_manager_t manager,
+                                       size_t num_arrays, klee_array_t *arrays,
+                                       const char *path);
+
+extern void klee_expr_set_mem_from_ktest(void *mem, size_t length,
+                                         const char *name, const char *path,
+                                         void *cookie);
+
 extern klee_expr_width_t klee_expr_get_width(klee_expr_t expr);
 
 extern bool klee_expr_is_constant(klee_expr_t expr);

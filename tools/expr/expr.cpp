@@ -17,6 +17,7 @@
 #include "klee/Constraints.h"
 #include "klee/Expr.h"
 #include "klee/ExprBuilder.h"
+#include "klee/Internal/ADT/KTest.h"
 #include "klee/Solver.h"
 
 #include "llvm/Support/CBindingWrapping.h"
@@ -113,7 +114,111 @@ klee_expr_constraint_manager_get_smtlibv2(klee_constraint_manager_t manager) {
   TheZ3Solver->setCoreSolverTimeout(klee::time::Span("30s"));
 
   Query TheQuery(*TheManager, ConstantExpr::alloc(0, klee::Expr::Bool));
-  return TheZ3Solver->getConstraintLog(TheQuery);
+  const char *result = TheZ3Solver->getConstraintLog(TheQuery);
+  delete TheZ3Solver;
+  return result;
+}
+
+int klee_expr_constraint_manager_get_ktest(klee_constraint_manager_t manager,
+                                           size_t num_arrays,
+                                           klee_array_t *arrays,
+                                           const char *path) {
+  std::vector<const Array *> Objects;
+  Objects.reserve(num_arrays);
+
+  std::vector<std::vector<unsigned char>> Values;
+  Values.reserve(num_arrays);
+
+  KTest Test;
+  int retval;
+
+  ConstraintManager *TheManager = unwrap(manager);
+
+  Solver *TheZ3Solver = klee::createCoreSolver(klee::CoreSolverType::Z3_SOLVER);
+  TheZ3Solver->setCoreSolverTimeout(klee::time::Span("30s"));
+
+  Query TheQuery(*TheManager, ConstantExpr::alloc(0, klee::Expr::Bool));
+
+  for (auto arr = arrays, arr_end = arrays + num_arrays; arr != arr_end; ++arr)
+    Objects.push_back(unwrap(*arr)->get());
+
+  if (!TheZ3Solver->getInitialValues(TheQuery, Objects, Values)) {
+    retval = 1;
+    goto cleanup;
+  }
+
+  Test.numArgs = 0;
+  Test.args = NULL;
+  Test.symArgvs = 0;
+  Test.symArgvLen = 0;
+  Test.numObjects = num_arrays;
+  Test.objects = new KTestObject[num_arrays];
+  assert(Test.objects);
+  for (unsigned i = 0; i < num_arrays; ++i) {
+    KTestObject *Obj = &Test.objects[i];
+    Obj->name = const_cast<char *>(Objects[i]->getName().c_str());
+    Obj->numBytes = Values[i].size();
+    Obj->bytes = new unsigned char[Obj->numBytes];
+    assert(Obj->bytes);
+    std::copy(Values[i].begin(), Values[i].end(), Obj->bytes);
+  }
+
+  if (!kTest_toFile(&Test, path)) {
+    retval = 1;
+    goto cleanup1;
+  }
+
+  retval = 0;
+
+cleanup1:
+  for (unsigned i = 0; i < num_arrays; ++i) {
+    delete[] Test.objects[i].bytes;
+  }
+  delete[] Test.objects;
+cleanup:
+  delete TheZ3Solver;
+  return retval;
+}
+
+void klee_expr_set_mem_from_ktest(void *mem, size_t length, const char *name,
+                                  const char *path, void **cookie) {
+  if (name == NULL)
+    name = "unnamed";
+
+  KTest *testData = NULL;
+
+  if (*cookie == NULL) {
+    testData = kTest_fromFile(path);
+    if (testData == NULL) {
+      llvm::errs() << "Cannot replay, no KTEST_FILE!\n";
+      exit(1);
+    }
+    *cookie = static_cast<void *>(testData);
+  } else {
+    testData = static_cast<KTest *>(*cookie);
+  }
+
+  for (size_t testPosition = 0;; ++testPosition) {
+    if (testPosition >= testData->numObjects) {
+      llvm::errs() << "Could not find a matching object in the test data... "
+                      "continuing with zero!\n";
+      memset(mem, 0, length);
+      break;
+    } else {
+      KTestObject *Obj = &testData->objects[testPosition];
+      if (strcmp(name, Obj->name) == 0) {
+        memcpy(mem, Obj->bytes,
+               length < Obj->numBytes ? length : Obj->numBytes);
+        if (length != Obj->numBytes) {
+          llvm::errs() << "object sizes differ. Expected " << length
+                       << "but got " << Obj->numBytes << "\n";
+          if (Obj->numBytes < length)
+            memset((char *) mem + Obj->numBytes, 0, length - Obj->numBytes);
+        }
+      }
+      break;
+    }
+  }
 }
 
 klee_expr_width_t klee_expr_get_width(klee_expr_t expr) {
@@ -132,8 +237,9 @@ int klee_expr_compare(klee_expr_t lhs, klee_expr_t rhs) {
   return Lhs->compare(*Rhs);
 }
 
-// Clients need to make sure they call this to ensure Exprs aren't held on
-// forever
+// Clients need to make sure they
+// call this to ensure Exprs aren't
+// held on forever
 void klee_expr_dispose(klee_expr_t expr) {
   ref<Expr> *TheRefExpr = unwrap(expr);
   delete TheRefExpr;
@@ -188,7 +294,9 @@ void klee_array_dispose(klee_array_t array) {
 
 klee_update_list_t klee_update_list_create(const klee_array_t array) {
   auto *TheArray = unwrap(array);
-  // Bump the reference count of the array so that it lives on when disposed of
+  // Bump the reference count of the
+  // array so that it lives on when
+  // disposed of
   UpdateList *TheUpdateList = new UpdateList(TheArray->get(), nullptr);
   return wrap(TheUpdateList);
 }
@@ -210,10 +318,14 @@ klee_update_list_t klee_update_list_copy(klee_update_list_t list) {
 
 void klee_update_list_dispose(klee_update_list_t list) {
   UpdateList *TheUpdateList = unwrap(list);
-  // This should automatically at the end of the scope decrement the reference
-  // count of the underlying array and delete it if necessary
-  // XXX: This is disgusting but we need this to support ref-counted array's
-  // here
+  // This should automatically at
+  // the end of the scope decrement
+  // the reference count of the
+  // underlying array and delete it
+  // if necessary
+  // XXX: This is disgusting but we
+  // need this to support
+  // ref-counted array's here
   auto *TheDirtyArray = const_cast<Array *>(TheUpdateList->root);
   ref<Array> TheRefArray(TheDirtyArray);
   delete TheUpdateList;
