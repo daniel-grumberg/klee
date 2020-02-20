@@ -126,6 +126,8 @@ int klee_expr_constraint_manager_get_ktest(klee_constraint_manager_t manager,
   std::vector<const Array *> Objects;
   Objects.reserve(num_arrays);
 
+  std::vector<std::string> Names;
+  Names.reserve(num_arrays);
   std::vector<std::vector<unsigned char>> Values;
   Values.reserve(num_arrays);
 
@@ -139,8 +141,12 @@ int klee_expr_constraint_manager_get_ktest(klee_constraint_manager_t manager,
 
   Query TheQuery(*TheManager, ConstantExpr::alloc(0, klee::Expr::Bool));
 
-  for (auto arr = arrays, arr_end = arrays + num_arrays; arr != arr_end; ++arr)
-    Objects.push_back(unwrap(*arr)->get());
+  for (auto arr = arrays, arr_end = arrays + num_arrays; arr != arr_end;
+       ++arr) {
+    ref<Array> *TheArray = unwrap(*arr);
+    Objects.push_back(TheArray->get());
+    Names.push_back(TheArray->get()->getName());
+  }
 
   if (!TheZ3Solver->getInitialValues(TheQuery, Objects, Values)) {
     retval = 1;
@@ -156,7 +162,7 @@ int klee_expr_constraint_manager_get_ktest(klee_constraint_manager_t manager,
   assert(Test.objects);
   for (unsigned i = 0; i < num_arrays; ++i) {
     KTestObject *Obj = &Test.objects[i];
-    Obj->name = const_cast<char *>(Objects[i]->getName().c_str());
+    Obj->name = const_cast<char *>(Names[i].c_str());
     Obj->numBytes = Values[i].size();
     Obj->bytes = new unsigned char[Obj->numBytes];
     assert(Obj->bytes);
@@ -180,45 +186,68 @@ cleanup:
   return retval;
 }
 
-void klee_expr_set_mem_from_ktest(void *mem, size_t length, const char *name,
-                                  const char *path, void **cookie) {
-  if (name == NULL)
-    name = "unnamed";
+static int load_ktest(const char *path, KTest **test_data, char *test_data_path,
+                      size_t test_data_path_length, void **cookie) {
+  strncpy(test_data_path, path, test_data_path_length - 1);
+  test_data_path[test_data_path_length - 1] = '\0';
+  *test_data = kTest_fromFile(path);
+  if (test_data == NULL) {
+    llvm::errs() << "Can not load a KTEST_FILE from " << path << "!\n";
+    return 1;
+  }
+  *cookie = static_cast<void *>(*test_data);
+  return 0;
+}
 
-  KTest *testData = NULL;
+int klee_expr_set_mem_from_ktest(void *mem, size_t length, const char *name,
+                                 const char *path, void **cookie) {
+  KTest *TestData = NULL;
+  static char TestDataPath[PATH_MAX];
+  int retval = 1;
 
-  if (*cookie == NULL) {
-    testData = kTest_fromFile(path);
-    if (testData == NULL) {
-      llvm::errs() << "Cannot replay, no KTEST_FILE!\n";
-      exit(1);
-    }
-    *cookie = static_cast<void *>(testData);
-  } else {
-    testData = static_cast<KTest *>(*cookie);
+  if (name == NULL) {
+    retval = 1;
+    goto out;
   }
 
-  for (size_t testPosition = 0;; ++testPosition) {
-    if (testPosition >= testData->numObjects) {
+  if (*cookie == NULL) {
+    if (load_ktest(path, &TestData, TestDataPath, PATH_MAX, cookie))
+      goto out;
+  } else {
+    if (strcmp(TestDataPath, path) == 0) {
+      TestData = static_cast<KTest *>(*cookie);
+    } else {
+      // TODO: free existing TestData (KTest hierarchy needs correct dtors)
+      if (load_ktest(path, &TestData, TestDataPath, PATH_MAX, cookie))
+        goto out;
+    }
+  }
+
+  for (size_t TestPosition = 0;; ++TestPosition) {
+    if (TestPosition >= TestData->numObjects) {
       llvm::errs() << "Could not find a matching object in the test data... "
                       "continuing with zero!\n";
       memset(mem, 0, length);
       break;
     } else {
-      KTestObject *Obj = &testData->objects[testPosition];
+      KTestObject *Obj = &TestData->objects[TestPosition];
       if (strcmp(name, Obj->name) == 0) {
         memcpy(mem, Obj->bytes,
                length < Obj->numBytes ? length : Obj->numBytes);
         if (length != Obj->numBytes) {
-          llvm::errs() << "object sizes differ. Expected " << length
-                       << "but got " << Obj->numBytes << "\n";
+          llvm::errs() << "Object sizes differ for " << Obj->name <<". Expected " << length
+                       << " but got " << Obj->numBytes << "\n";
           if (Obj->numBytes < length)
-            memset((char *) mem + Obj->numBytes, 0, length - Obj->numBytes);
+            memset((char *)mem + Obj->numBytes, 0, length - Obj->numBytes);
         }
+        break;
       }
-      break;
     }
   }
+
+  retval = 0;
+out:
+  return retval;
 }
 
 klee_expr_width_t klee_expr_get_width(klee_expr_t expr) {

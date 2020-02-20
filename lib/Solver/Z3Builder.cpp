@@ -426,7 +426,7 @@ Z3ASTHandle Z3Builder::getInitialArray(const Array *root) {
 }
 
 Z3ASTHandle Z3Builder::getInitialRead(const Array *root, unsigned index) {
-  return readExpr(getInitialArray(root), bvConst32(32, index));
+  return readExpr(getInitialArray(root), bvConst64(64, index));
 }
 
 Z3ASTHandle Z3Builder::getArrayForUpdate(const Array *root,

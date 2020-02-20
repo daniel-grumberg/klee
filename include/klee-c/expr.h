@@ -73,9 +73,9 @@ klee_expr_constraint_manager_get_ktest(klee_constraint_manager_t manager,
                                        size_t num_arrays, klee_array_t *arrays,
                                        const char *path);
 
-extern void klee_expr_set_mem_from_ktest(void *mem, size_t length,
+extern int klee_expr_set_mem_from_ktest(void *mem, size_t length,
                                          const char *name, const char *path,
-                                         void *cookie);
+                                         void **cookie);
 
 extern klee_expr_width_t klee_expr_get_width(klee_expr_t expr);
 
