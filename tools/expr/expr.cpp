@@ -65,8 +65,9 @@ static klee_expr_t allocating_wrap(const LibExprBuilder *Builder,
 klee_expr_builder_t
 klee_expr_builder_create(registration_fn_t registration_fn) {
   ExprBuilder *DefaultBuilder = createDefaultExprBuilder();
+  ExprBuilder *SimplifyingBuilder = klee::createSimplifyingExprBuilder(DefaultBuilder);
   LibExprBuilder *TheBuilder =
-      new LibExprBuilder(DefaultBuilder, registration_fn);
+      new LibExprBuilder(SimplifyingBuilder, registration_fn);
   return wrap(TheBuilder);
 }
 
