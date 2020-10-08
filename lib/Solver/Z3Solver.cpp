@@ -55,6 +55,7 @@ private:
   Z3Builder *builder;
   time::Span timeout;
   SolverRunStatus runStatusCode;
+  ref<SolverListener> listener;
   std::unique_ptr<llvm::raw_fd_ostream> dumpedQueriesFile;
   ::Z3_params solverParameters;
   // Parameter symbols
@@ -67,7 +68,7 @@ private:
   bool validateZ3Model(::Z3_solver &theSolver, ::Z3_model &theModel);
 
 public:
-  Z3SolverImpl();
+  Z3SolverImpl(ref<SolverListener> listener);
   ~Z3SolverImpl();
 
   char *getConstraintLog(const Query &);
@@ -95,13 +96,14 @@ public:
   SolverRunStatus getOperationStatusCode();
 };
 
-Z3SolverImpl::Z3SolverImpl()
+Z3SolverImpl::Z3SolverImpl(ref<SolverListener> listener)
     : builder(new Z3Builder(
           /*autoClearConstructCache=*/false,
           /*z3LogInteractionFileArg=*/Z3LogInteractionFile.size() > 0
               ? Z3LogInteractionFile.c_str()
-              : NULL)),
-      runStatusCode(SOLVER_RUN_STATUS_FAILURE) {
+              : NULL,
+          listener)),
+      runStatusCode(SOLVER_RUN_STATUS_FAILURE), listener(listener) {
   assert(builder && "unable to create Z3Builder");
   solverParameters = Z3_mk_params(builder->ctx);
   Z3_params_inc_ref(builder->ctx, solverParameters);
@@ -133,7 +135,9 @@ Z3SolverImpl::~Z3SolverImpl() {
   delete builder;
 }
 
-Z3Solver::Z3Solver() : Solver(new Z3SolverImpl()) {}
+Z3Solver::Z3Solver() : Z3Solver(ref<SolverListener>(new SolverListener)) {}
+Z3Solver::Z3Solver(ref<SolverListener> listener)
+    : Solver(new Z3SolverImpl(listener)) {}
 
 char *Z3Solver::getConstraintLog(const Query &query) {
   return impl->getConstraintLog(query);
@@ -144,6 +148,7 @@ void Z3Solver::setCoreSolverTimeout(time::Span timeout) {
 }
 
 char *Z3SolverImpl::getConstraintLog(const Query &query) {
+  listener->getConstraintLogEntry();
   std::vector<Z3ASTHandle> assumptions;
   // We use a different builder here because we don't want to interfere
   // with the solver's builder because it may change the solver builder's
@@ -151,7 +156,7 @@ char *Z3SolverImpl::getConstraintLog(const Query &query) {
   // NOTE: The builder does not set `z3LogInteractionFile` to avoid conflicting
   // with whatever the solver's builder is set to do.
   Z3Builder temp_builder(/*autoClearConstructCache=*/false,
-                         /*z3LogInteractionFile=*/NULL);
+                         /*z3LogInteractionFile=*/NULL, listener);
   ConstantArrayFinder constant_arrays_in_query;
   for (auto const &constraint : query.constraints) {
     assumptions.push_back(temp_builder.construct(constraint));
@@ -204,6 +209,8 @@ char *Z3SolverImpl::getConstraintLog(const Query &query) {
   // `formula`.
   assumptions.clear();
   formula = Z3ASTHandle(NULL, temp_builder.ctx);
+
+  listener->getConstraintLogExit();
   // Client is responsible for freeing the returned C-string
   return strdup(result);
 }

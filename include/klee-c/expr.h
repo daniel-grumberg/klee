@@ -67,15 +67,26 @@ klee_expr_constraint_manager_dump(klee_constraint_manager_t manager);
 
 extern const char *
 klee_expr_constraint_manager_get_smtlibv2(klee_constraint_manager_t manager);
+// Caller is responsible for freeing the contents of array_names and
+// smt_array_names
+extern const char *klee_expr_constraint_manager_get_smtlibv2_with_map(
+    klee_constraint_manager_t manager, size_t *num_objects,
+    const char ***array_names, const char ***smt_array_names);
 
 extern int
 klee_expr_constraint_manager_get_ktest(klee_constraint_manager_t manager,
                                        size_t num_arrays, klee_array_t *arrays,
                                        const char *path);
 
+extern int klee_expr_write_ktest_from_values(size_t num_arrays,
+                                             const char **arrays,
+                                             const size_t *values_sizes,
+                                             const unsigned char **values,
+                                             const char *path);
+
 extern int klee_expr_set_mem_from_ktest(void *mem, size_t length,
-                                         const char *name, const char *path,
-                                         void **cookie);
+                                        const char *name, const char *path,
+                                        void **cookie);
 
 extern klee_expr_width_t klee_expr_get_width(klee_expr_t expr);
 

@@ -11,6 +11,7 @@
 #define __UTIL_Z3BUILDER_H__
 
 #include "klee/Config/config.h"
+#include "klee/Solver.h"
 #include "klee/util/ArrayExprHash.h"
 #include "klee/util/ExprHashMap.h"
 #include <unordered_map>
@@ -167,12 +168,14 @@ private:
   Z3SortHandle getArraySort(Z3SortHandle domainSort, Z3SortHandle rangeSort);
   bool autoClearConstructCache;
   std::string z3LogInteractionFile;
+  ref<SolverListener> listener;
 
 public:
   Z3_context ctx;
   std::unordered_map<const Array *, std::vector<Z3ASTHandle> >
       constant_array_assertions;
-  Z3Builder(bool autoClearConstructCache, const char *z3LogInteractionFile);
+  Z3Builder(bool autoClearConstructCache, const char *z3LogInteractionFile,
+            ref<SolverListener> listener);
   ~Z3Builder();
 
   Z3ASTHandle getTrue();

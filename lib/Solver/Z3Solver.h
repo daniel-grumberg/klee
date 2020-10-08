@@ -20,6 +20,9 @@ public:
   /// Z3Solver - Construct a new Z3Solver.
   Z3Solver();
 
+  /// Z3Solver - Construct a new Z3Solver with a listener
+  Z3Solver(ref<SolverListener> listener);
+
   /// Get the query in SMT-LIBv2 format.
   /// \return A C-style string. The caller is responsible for freeing this.
   virtual char *getConstraintLog(const Query &);

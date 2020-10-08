@@ -20,6 +20,10 @@
 namespace klee {
 
 Solver *createCoreSolver(CoreSolverType cst) {
+  return createCoreSolver(cst, ref<SolverListener>(new SolverListener()));
+}
+
+Solver *createCoreSolver(CoreSolverType cst, ref<SolverListener> listener) {
   switch (cst) {
   case STP_SOLVER:
 #ifdef ENABLE_STP
@@ -42,7 +46,7 @@ Solver *createCoreSolver(CoreSolverType cst) {
   case Z3_SOLVER:
 #ifdef ENABLE_Z3
     klee_message("Using Z3 solver backend");
-    return new Z3Solver();
+    return new Z3Solver(listener);
 #else
     klee_message("Not compiled with Z3 support");
     return NULL;
@@ -54,4 +58,4 @@ Solver *createCoreSolver(CoreSolverType cst) {
     llvm_unreachable("Unsupported CoreSolverType");
   }
 }
-}
+} // namespace klee

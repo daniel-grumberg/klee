@@ -74,8 +74,11 @@ void Z3ArrayExprHash::clear() {
   _array_hash.clear();
 }
 
-Z3Builder::Z3Builder(bool autoClearConstructCache, const char* z3LogInteractionFileArg)
-    : autoClearConstructCache(autoClearConstructCache), z3LogInteractionFile("") {
+Z3Builder::Z3Builder(bool autoClearConstructCache,
+                     const char *z3LogInteractionFileArg,
+                     ref<SolverListener> listener)
+    : autoClearConstructCache(autoClearConstructCache),
+      z3LogInteractionFile(""), listener(listener) {
   if (z3LogInteractionFileArg)
     this->z3LogInteractionFile = std::string(z3LogInteractionFileArg);
   if (z3LogInteractionFile.length() > 0) {
@@ -401,6 +404,7 @@ Z3ASTHandle Z3Builder::getInitialArray(const Array *root) {
 
     array_expr = buildArray(unique_name.c_str(), root->getDomain(),
                             root->getRange());
+    listener->buildArray(root, unique_name);
 
     if (root->isConstantArray() && constant_array_assertions.count(root) == 0) {
       std::vector<Z3ASTHandle> array_assertions;

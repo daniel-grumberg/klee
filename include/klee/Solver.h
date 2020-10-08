@@ -49,6 +49,20 @@ namespace klee {
     void dump() const ;
   };
 
+  class SolverListener {
+  public:
+    SolverListener() : refCount(0) {}
+    virtual ~SolverListener() = default;
+
+    virtual void getConstraintLogEntry() {}
+    virtual void getConstraintLogExit() {}
+    virtual void buildArray(const Array *root, const std::string &name) {}
+
+  private:
+    template <typename T> friend class ref;
+    unsigned refCount;
+  };
+
   class Solver {
     // DO NOT IMPLEMENT.
     Solver(const Solver&);
@@ -268,6 +282,7 @@ namespace klee {
 
   // Create a solver based on the supplied ``CoreSolverType``.
   Solver *createCoreSolver(CoreSolverType cst);
+  Solver *createCoreSolver(CoreSolverType cst, ref<SolverListener> listener);
 }
 
 #endif

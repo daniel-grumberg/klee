@@ -20,7 +20,12 @@
 #include "klee/Internal/ADT/KTest.h"
 #include "klee/Solver.h"
 
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/CBindingWrapping.h"
+
+#include <algorithm>
+#include <cstring>
+#include <string>
 
 using namespace klee;
 
@@ -33,6 +38,25 @@ struct LibExprBuilder {
       : Builder(TheBuilder), RegistrationFn(TheRegistrationFn) {}
   std::unique_ptr<ExprBuilder> Builder;
   registration_fn_t RegistrationFn;
+};
+
+class Z3ArrayNameMappingSolverListener : public SolverListener {
+public:
+  llvm::StringMap<std::string> arrayNameMap;
+
+  Z3ArrayNameMappingSolverListener()
+      : SolverListener(), inGetConstraintLog(false) {}
+
+  void getConstraintLogEntry() override { inGetConstraintLog = true; }
+  void getConstraintLogExit() override { inGetConstraintLog = false; }
+
+  void buildArray(const Array *root, const std::string &name) override {
+    if (inGetConstraintLog)
+      arrayNameMap[root->getName()] = name;
+  }
+
+private:
+  bool inGetConstraintLog;
 };
 
 } // namespace
@@ -109,13 +133,40 @@ void klee_expr_constraint_manager_dump(klee_constraint_manager_t manager) {
 
 const char *
 klee_expr_constraint_manager_get_smtlibv2(klee_constraint_manager_t manager) {
+  return klee_expr_constraint_manager_get_smtlibv2_with_map(manager, nullptr,
+                                                            nullptr, nullptr);
+}
+
+const char *klee_expr_constraint_manager_get_smtlibv2_with_map(
+    klee_constraint_manager_t manager, size_t *num_objects,
+    const char ***array_names, const char ***smt_array_names) {
   ConstraintManager *TheManager = unwrap(manager);
 
-  Solver *TheZ3Solver = klee::createCoreSolver(klee::CoreSolverType::Z3_SOLVER);
+  ref<Z3ArrayNameMappingSolverListener> Listener(
+      new Z3ArrayNameMappingSolverListener());
+  Solver *TheZ3Solver =
+      klee::createCoreSolver(klee::CoreSolverType::Z3_SOLVER, Listener);
   TheZ3Solver->setCoreSolverTimeout(klee::time::Span("30s"));
 
   Query TheQuery(*TheManager, ConstantExpr::alloc(0, klee::Expr::Bool));
   const char *result = TheZ3Solver->getConstraintLog(TheQuery);
+
+  if (num_objects && array_names && smt_array_names) {
+    const char **names =
+        (const char **)malloc(Listener->arrayNameMap.size() * sizeof(*names));
+    const char **mapped_names = (const char **)malloc(
+        Listener->arrayNameMap.size() * sizeof(*mapped_names));
+    unsigned i = 0;
+    for (const auto &arr : Listener->arrayNameMap) {
+      names[i] = strdup(arr.getKeyData());
+      mapped_names[i] = strdup(arr.getValue().c_str());
+      ++i;
+    }
+    *num_objects = i;
+    *array_names = names;
+    *smt_array_names = mapped_names;
+  }
+
   delete TheZ3Solver;
   return result;
 }
@@ -184,6 +235,44 @@ cleanup1:
   delete[] Test.objects;
 cleanup:
   delete TheZ3Solver;
+  return retval;
+}
+
+int klee_expr_write_ktest_from_values(size_t num_objects, const char **names,
+                                      const size_t *values_sizes,
+                                      const unsigned char **values,
+                                      const char *path) {
+  int retval;
+  KTest Test;
+
+  Test.numArgs = 0;
+  Test.args = NULL;
+  Test.symArgvs = 0;
+  Test.symArgvLen = 0;
+  Test.numObjects = num_objects;
+  Test.objects = new KTestObject[num_objects];
+  assert(Test.objects);
+  for (unsigned i = 0; i < num_objects; ++i) {
+    KTestObject *Obj = &Test.objects[i];
+    Obj->name = const_cast<char *>(names[i]);
+    Obj->numBytes = values_sizes[i];
+    Obj->bytes = new unsigned char[Obj->numBytes];
+    assert(Obj->bytes);
+    std::copy(values[i], values[i] + Obj->numBytes, Obj->bytes);
+  }
+
+  if (!kTest_toFile(&Test, path)) {
+    retval = 1;
+    goto cleanup;
+  }
+
+  retval = 0;
+
+cleanup:
+  for (unsigned i = 0; i < num_objects; ++i) {
+    delete[] Test.objects[i].bytes;
+  }
+  delete[] Test.objects;
   return retval;
 }
 
